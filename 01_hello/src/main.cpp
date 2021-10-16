@@ -23,7 +23,7 @@ int main() {
 
     cl_device_id deviceId = 0;
     cl_uint deviceCount = 0;
-    clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 1, &deviceId, &deviceCount);
+    clGetDeviceIDs(platform[1], CL_DEVICE_TYPE_GPU, 1, &deviceId, &deviceCount);
     cl_context context = clCreateContext(nullptr, 1, &deviceId, nullptr, nullptr, nullptr);
     cl_command_queue queue = clCreateCommandQueue(context, deviceId, 0, nullptr);
 
@@ -33,9 +33,9 @@ int main() {
         cl_program program = clCreateProgramWithSource(context, 1, strings, nullptr, nullptr);
         clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
         cl_kernel kernel = clCreateKernel(program, "whoAmI", nullptr);
-        constexpr size_t globalWorkSize[] = {10};
-        constexpr size_t localWorkSize[] = {5, 5};
-        clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
+        constexpr size_t globalWorkSize = 10;
+        constexpr size_t localWorkSize = 5;
+        clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, &localWorkSize, 0, nullptr, nullptr);
 
         clReleaseKernel(kernel);
         clReleaseProgram(program);
@@ -56,8 +56,7 @@ int main() {
         clEnqueueWriteBuffer(queue, memory, CL_TRUE, 0, elemCount * sizeof(cl_int), arr.data(), 0, nullptr, nullptr);
         clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&memory);
 
-        constexpr size_t globalWorkSize[] = {elemCount};
-        clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
+        clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &elemCount, nullptr, 0, nullptr, nullptr);
         clEnqueueReadBuffer(queue, memory, CL_TRUE, 0, elemCount * sizeof(cl_int), arr.data(), 0, nullptr, nullptr);
 
         Utils::print(arr);
