@@ -113,11 +113,11 @@ void daxpy_ocl(int n, double a, double *x, int incx, double *y, int incy, cl_dev
 }
 
 void saxpy_omp(int n, float a, float *x, int incx, float *y, int incy) {
-#pragma omp for
+#pragma omp parallel for
     AXPY_IMPL
 }
 
 void daxpy_omp(int n, double a, double *x, int incx, double *y, int incy) {
-#pragma omp for
+#pragma omp parallel for
     AXPY_IMPL
 }

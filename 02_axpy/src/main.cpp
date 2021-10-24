@@ -42,6 +42,8 @@ int main() {
     constexpr float a = 4;
 
     {
+        std::cout << "---\nSingle-precision\n";
+
         std::vector<float> xInit(xSize, 0.f);
         Utils::fillWithStride(xInit, 1.f, incx);
         // Utils::print(xInit);
@@ -96,6 +98,8 @@ int main() {
     }
 
     {
+        std::cout << "---\nDouble-precision\n";
+
         std::vector<double> xInit(xSize, 0.);
         Utils::fillWithStride(xInit, 1., incx);
         // Utils::print(xInit);
