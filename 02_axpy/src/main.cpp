@@ -12,6 +12,12 @@
 #include "utils.hpp"
 
 int main() {
+#pragma omp parallel
+    {
+#pragma omp single
+        std::cout << "OpenMP: " << omp_get_num_threads() << " threads" << std::endl;
+    }
+
     cl_uint platformCount = 0;
     clGetPlatformIDs(0, nullptr, &platformCount);
     cl_platform_id *platform = new cl_platform_id[platformCount];
@@ -24,7 +30,7 @@ int main() {
     clGetDeviceInfo(cpuDeviceId, CL_DEVICE_NAME, 128, deviceName, nullptr);
     std::cout << "CPU: " << deviceName << std::endl;
     cl_device_id gpuDeviceId = 0;
-    clGetDeviceIDs(platform[1], CL_DEVICE_TYPE_GPU, 1, &gpuDeviceId, &deviceCount);
+    clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 1, &gpuDeviceId, &deviceCount);
     clGetDeviceInfo(gpuDeviceId, CL_DEVICE_NAME, 128, deviceName, nullptr);
     std::cout << "GPU: " << deviceName << std::endl;
 
@@ -47,7 +53,7 @@ int main() {
         std::vector<float> yTarget;
 
         {
-            std::cout << "Sequential" << std::endl;
+            std::cout << "Sequential ";
 
             auto y = yInit;
             double begin = omp_get_wtime();
@@ -58,34 +64,33 @@ int main() {
         }
 
         {
-            std::cout << "OpenMP" << std::endl;
-            std::cout << omp_get_num_threads() << " threads" << std::endl;
+            std::cout << "OpenMP ";
 
             auto y = yInit;
             double begin = omp_get_wtime();
             saxpy_omp(n, a, xInit.data(), incx, y.data(), incy);
             double end = omp_get_wtime();
-            std::cout << (end - begin) << std::endl;
+            std::cout << (end - begin) << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
         }
 
         {
-            std::cout << "OpenCL CPU" << std::endl;
+            std::cout << "OpenCL CPU ";
 
             auto y = yInit;
             double elapsed;
             saxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, cpuDeviceId, &elapsed);
-            std::cout << elapsed << std::endl;
+            std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
         }
 
         {
-            std::cout << "OpenCL GPU" << std::endl;
+            std::cout << "OpenCL GPU ";
 
             auto y = yInit;
             double elapsed;
             saxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, gpuDeviceId, &elapsed);
-            std::cout << elapsed << std::endl;
+            std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
         }
     }
@@ -102,7 +107,7 @@ int main() {
         std::vector<double> yTarget;
 
         {
-            std::cout << "Sequential" << std::endl;
+            std::cout << "Sequential ";
 
             auto y = yInit;
             double begin = omp_get_wtime();
@@ -113,34 +118,33 @@ int main() {
         }
 
         {
-            std::cout << "OpenMP" << std::endl;
-            std::cout << omp_get_num_threads() << " threads" << std::endl;
+            std::cout << "OpenMP ";
 
             auto y = yInit;
             double begin = omp_get_wtime();
             daxpy_omp(n, a, xInit.data(), incx, y.data(), incy);
             double end = omp_get_wtime();
-            std::cout << (end - begin) << std::endl;
+            std::cout << (end - begin) << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
         }
 
         {
-            std::cout << "OpenCL CPU" << std::endl;
+            std::cout << "OpenCL CPU ";
 
             auto y = yInit;
             double elapsed;
             daxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, cpuDeviceId, &elapsed);
-            std::cout << elapsed << std::endl;
+            std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
         }
 
         {
-            std::cout << "OpenCL GPU" << std::endl;
+            std::cout << "OpenCL GPU ";
 
             auto y = yInit;
             double elapsed;
             daxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, gpuDeviceId, &elapsed);
-            std::cout << elapsed << std::endl;
+            std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
         }
     }
