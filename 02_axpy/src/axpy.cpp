@@ -48,9 +48,11 @@ void saxpy_ocl(int n, float a, float *x, int incx, float *y, int incy, cl_device
     clGetKernelWorkGroupInfo(kernel, deviceId, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &group, nullptr);
 
     const size_t globalWorkSize = static_cast<size_t>(n);
+    const size_t localWorkSize = 1u;
     // clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, &group, 0, nullptr, nullptr);
     double begin = omp_get_wtime();
-    clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+    clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, &localWorkSize, 0, nullptr, nullptr);
+    clFinish(queue);
     double end = omp_get_wtime();
     if (elapsed != nullptr)
         *elapsed = end - begin;
@@ -95,9 +97,11 @@ void daxpy_ocl(int n, double a, double *x, int incx, double *y, int incy, cl_dev
     clGetKernelWorkGroupInfo(kernel, deviceId, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &group, nullptr);
 
     const size_t globalWorkSize = static_cast<size_t>(n);
+    const size_t localWorkSize = 1u;
     // clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, &group, 0, nullptr, nullptr);
     double begin = omp_get_wtime();
-    clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+    clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, &localWorkSize, 0, nullptr, nullptr);
+    clFinish(queue);
     double end = omp_get_wtime();
     if (elapsed != nullptr)
         *elapsed = end - begin;

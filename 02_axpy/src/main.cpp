@@ -80,7 +80,7 @@ int main() {
             std::cout << "OpenCL CPU ";
 
             auto y = yInit;
-            double elapsed;
+            double elapsed = 0;
             saxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, cpuDeviceId, &elapsed);
             std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
@@ -90,7 +90,7 @@ int main() {
             std::cout << "OpenCL GPU ";
 
             auto y = yInit;
-            double elapsed;
+            double elapsed = 0;
             saxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, gpuDeviceId, &elapsed);
             std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
@@ -136,7 +136,7 @@ int main() {
             std::cout << "OpenCL CPU ";
 
             auto y = yInit;
-            double elapsed;
+            double elapsed = 0;
             daxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, cpuDeviceId, &elapsed);
             std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
@@ -146,7 +146,7 @@ int main() {
             std::cout << "OpenCL GPU ";
 
             auto y = yInit;
-            double elapsed;
+            double elapsed = 0;
             daxpy_ocl(n, a, xInit.data(), incx, y.data(), incy, gpuDeviceId, &elapsed);
             std::cout << elapsed << ' ';
             std::cout << Utils::status(y == yTarget) << std::endl;
