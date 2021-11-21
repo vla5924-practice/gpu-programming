@@ -56,23 +56,21 @@ int main() {
         multiply_omp(a.data(), b.data(), c.data(), m, n, k);
         float end = omp_get_wtime();
         std::cout << "OpenMP: " << (end - begin) << ' ';
-        std::cout << Utils::status(c == cTarget) << std::endl;
+        std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
     }
     {
         std::vector<float> c(m * k, 0);
         float elapsed = 0;
         multiply_ocl(a.data(), b.data(), c.data(), m, n, k, cpuDeviceId, &elapsed);
         std::cout << "OpenCL CPU: " << elapsed << ' ';
-        std::cout << Utils::status(c == cTarget) << std::endl;
-        Utils::print(c);
+        std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
     }
     {
         std::vector<float> c(m * k, 0);
         float elapsed = 0;
         multiply_ocl(a.data(), b.data(), c.data(), m, n, k, gpuDeviceId, &elapsed);
         std::cout << "OpenCL GPU: " << elapsed << ' ';
-        std::cout << Utils::status(c == cTarget) << std::endl;
-        Utils::print(c);
+        std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
     }
 
     delete[] platform;
