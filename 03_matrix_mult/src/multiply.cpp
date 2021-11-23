@@ -29,7 +29,9 @@ void multiply_omp(float *a, float *b, float *c, int m, int n, int k) {
     }
 }
 
-void multiply_ocl(float *a, float *b, float *c, int m, int n, int k, cl_device_id deviceId, float *elapsed) {
+namespace ocl {
+
+void multiply(float *a, float *b, float *c, int m, int n, int k, cl_device_id deviceId, float *elapsed) {
     cl_context context = clCreateContext(nullptr, 1, &deviceId, nullptr, nullptr, nullptr);
     cl_command_queue queue = clCreateCommandQueue(context, deviceId, 0, nullptr);
 
@@ -80,3 +82,148 @@ void multiply_ocl(float *a, float *b, float *c, int m, int n, int k, cl_device_i
     clReleaseCommandQueue(queue);
     clReleaseContext(context);
 }
+
+void multiplyBlock(float *a, float *b, float *c, int m, int n, int k, cl_device_id deviceId, float *elapsed) {
+    cl_context context = clCreateContext(nullptr, 1, &deviceId, nullptr, nullptr, nullptr);
+    cl_command_queue queue = clCreateCommandQueue(context, deviceId, 0, nullptr);
+
+    cl_mem aMem = nullptr;
+    cl_mem bMem = nullptr;
+    cl_mem cMem = nullptr;
+
+    cl_int ret;
+    std::string source = Utils::readFile(KERNELS_DIR "multiplyBlock.cl");
+    const char *strings[] = {source.c_str()};
+    cl_program program = clCreateProgramWithSource(context, 1, strings, nullptr, &ret);
+    ret = clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
+    cl_kernel kernel = clCreateKernel(program, "multiplyBlock", &ret);
+
+    aMem = clCreateBuffer(context, CL_MEM_READ_ONLY, m * n * sizeof(float), nullptr, &ret);
+    ret = clEnqueueWriteBuffer(queue, aMem, CL_TRUE, 0, m * n * sizeof(float), a, 0, nullptr, nullptr);
+    bMem = clCreateBuffer(context, CL_MEM_READ_ONLY, n * k * sizeof(float), nullptr, &ret);
+    ret = clEnqueueWriteBuffer(queue, bMem, CL_TRUE, 0, n * k * sizeof(float), b, 0, nullptr, nullptr);
+    cMem = clCreateBuffer(context, CL_MEM_READ_WRITE, m * k * sizeof(float), nullptr, &ret);
+    ret = clEnqueueWriteBuffer(queue, cMem, CL_TRUE, 0, m * k * sizeof(float), c, 0, nullptr, nullptr);
+
+    ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), &aMem);
+    ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), &bMem);
+    ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), &cMem);
+    ret = clSetKernelArg(kernel, 3, sizeof(int), &m);
+    ret = clSetKernelArg(kernel, 4, sizeof(int), &n);
+    ret = clSetKernelArg(kernel, 5, sizeof(int), &k);
+
+    size_t group;
+    clGetKernelWorkGroupInfo(kernel, deviceId, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &group, nullptr);
+
+    const size_t globalWorkSize[] = {static_cast<size_t>(m), static_cast<size_t>(k)};
+    const size_t localWorkSize[] = {16u, 16u};
+    float begin = omp_get_wtime();
+    ret = clEnqueueNDRangeKernel(queue, kernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
+    clFinish(queue);
+    float end = omp_get_wtime();
+    if (elapsed != nullptr)
+        *elapsed = end - begin;
+    ret = clEnqueueReadBuffer(queue, cMem, CL_TRUE, 0, m * k * sizeof(float), c, 0, nullptr, nullptr);
+
+    clReleaseMemObject(aMem);
+    clReleaseMemObject(bMem);
+    clReleaseMemObject(cMem);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+
+    clReleaseCommandQueue(queue);
+    clReleaseContext(context);
+}
+
+void multiplyImage(float *a, float *b, float *c, int m, int n, int k, cl_device_id deviceId, float *elapsed) {
+    cl_context context = clCreateContext(nullptr, 1, &deviceId, nullptr, nullptr, nullptr);
+    cl_command_queue queue = clCreateCommandQueue(context, deviceId, 0, nullptr);
+
+    cl_mem aMem = nullptr;
+    cl_mem bMem = nullptr;
+    cl_mem cMem = nullptr;
+
+    cl_int ret;
+    std::string source = Utils::readFile(KERNELS_DIR "multiplyImage.cl");
+    const char *strings[] = {source.c_str()};
+    cl_program program = clCreateProgramWithSource(context, 1, strings, nullptr, &ret);
+    ret = clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
+    if (ret == CL_BUILD_PROGRAM_FAILURE) {
+        // Determine the size of the log
+        size_t log_size;
+        clGetProgramBuildInfo(program, deviceId, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
+
+        // Allocate memory for the log
+        char *log = (char *)malloc(log_size);
+
+        // Get the log
+        clGetProgramBuildInfo(program, deviceId, CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
+
+        // Print the log
+        printf("%s\n", log);
+    }
+    cl_kernel kernel = clCreateKernel(program, "multiplyImageNaive", &ret);
+
+    {
+        cl_image_format format;
+        format.image_channel_order = CL_R;
+        format.image_channel_data_type = CL_FLOAT;
+        aMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, static_cast<size_t>(m), static_cast<size_t>(n), 0,
+                               nullptr, &ret);
+        const size_t origin[3]{0, 0, 0};
+        const size_t region[3]{static_cast<size_t>(m), static_cast<size_t>(n), 1};
+        ret = clEnqueueWriteImage(queue, aMem, CL_TRUE, origin, region, 0, 0, a, 0, nullptr, nullptr);
+    }
+    {
+        cl_image_format format;
+        format.image_channel_order = CL_R;
+        format.image_channel_data_type = CL_FLOAT;
+        bMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, static_cast<size_t>(n), static_cast<size_t>(k), 0,
+                               nullptr, &ret);
+        const size_t origin[3]{0, 0, 0};
+        const size_t region[3]{static_cast<size_t>(n), static_cast<size_t>(k), 1};
+        ret = clEnqueueWriteImage(queue, aMem, CL_TRUE, origin, region, 0, 0, b, 0, nullptr, nullptr);
+    }
+    {
+        cl_image_format format;
+        format.image_channel_order = CL_R;
+        format.image_channel_data_type = CL_FLOAT;
+        cMem = clCreateImage2D(context, CL_MEM_WRITE_ONLY, &format, static_cast<size_t>(m), static_cast<size_t>(k), 0,
+                               nullptr, &ret);
+        const size_t origin[3]{0, 0, 0};
+        const size_t region[3]{static_cast<size_t>(m), static_cast<size_t>(k), 1};
+        ret = clEnqueueWriteImage(queue, cMem, CL_TRUE, origin, region, 0, 0, c, 0, nullptr, nullptr);
+    }
+
+    ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), &aMem);
+    ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), &bMem);
+    ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), &cMem);
+    ret = clSetKernelArg(kernel, 3, sizeof(int), &m);
+    ret = clSetKernelArg(kernel, 4, sizeof(int), &n);
+    ret = clSetKernelArg(kernel, 5, sizeof(int), &k);
+
+    const size_t globalWorkSize[] = {static_cast<size_t>(m), static_cast<size_t>(k)};
+    const size_t localWorkSize[] = {16u, 16u};
+    float begin = omp_get_wtime();
+    ret = clEnqueueNDRangeKernel(queue, kernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
+    ret = clFinish(queue);
+    float end = omp_get_wtime();
+    if (elapsed != nullptr)
+        *elapsed = end - begin;
+    {
+        const size_t origin[3]{0, 0, 0};
+        const size_t region[3]{static_cast<size_t>(m), static_cast<size_t>(k), 1};
+        ret = clEnqueueReadImage(queue, cMem, CL_TRUE, origin, region, 0, 0, c, 0, nullptr, nullptr);
+    }
+
+    clReleaseMemObject(aMem);
+    clReleaseMemObject(bMem);
+    clReleaseMemObject(cMem);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+
+    clReleaseCommandQueue(queue);
+    clReleaseContext(context);
+}
+
+} // namespace ocl

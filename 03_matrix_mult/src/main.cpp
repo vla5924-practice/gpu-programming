@@ -34,22 +34,27 @@ int main() {
     clGetDeviceInfo(gpuDeviceId, CL_DEVICE_NAME, 128, deviceName, nullptr);
     std::cout << "GPU: " << deviceName << std::endl;
 
-    constexpr int m = 4;
-    constexpr int n = 8;
-    constexpr int k = 12;
+    constexpr int m = 1600;
+    constexpr int n = 1600;
+    constexpr int k = 1600;
 
     std::vector<float> a(m * n);
     std::vector<float> b(n * k);
     std::vector<float> cTarget(m * k);
     Utils::fillRandomly(a);
     Utils::fillRandomly(b);
+    std::cout << std::defaultfloat << std::setprecision(6);
 
     {
         float begin = omp_get_wtime();
         multiply(a.data(), b.data(), cTarget.data(), m, n, k);
         float end = omp_get_wtime();
         std::cout << "Sequential: " << (end - begin) << std::endl;
+        for (int i = 0; i < 10; i++)
+            std::cout << cTarget[i] << ' ';
+        std::cout << std::endl;
     }
+    std::cout << "------ Classic ------" << std::endl;
     {
         std::vector<float> c(m * k);
         float begin = omp_get_wtime();
@@ -61,16 +66,52 @@ int main() {
     {
         std::vector<float> c(m * k, 0);
         float elapsed = 0;
-        multiply_ocl(a.data(), b.data(), c.data(), m, n, k, cpuDeviceId, &elapsed);
+        ocl::multiply(a.data(), b.data(), c.data(), m, n, k, cpuDeviceId, &elapsed);
         std::cout << "OpenCL CPU: " << elapsed << ' ';
         std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
     }
     {
         std::vector<float> c(m * k, 0);
         float elapsed = 0;
-        multiply_ocl(a.data(), b.data(), c.data(), m, n, k, gpuDeviceId, &elapsed);
+        ocl::multiply(a.data(), b.data(), c.data(), m, n, k, gpuDeviceId, &elapsed);
         std::cout << "OpenCL GPU: " << elapsed << ' ';
         std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
+    }
+    std::cout << "------ Optimized ------" << std::endl;
+    {
+        std::vector<float> c(m * k, 0);
+        float elapsed = 0;
+        ocl::multiplyBlock(a.data(), b.data(), c.data(), m, n, k, cpuDeviceId, &elapsed);
+        std::cout << "OpenCL CPU: " << elapsed << ' ';
+        std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
+    }
+    {
+        std::vector<float> c(m * k, 0);
+        float elapsed = 0;
+        ocl::multiplyBlock(a.data(), b.data(), c.data(), m, n, k, gpuDeviceId, &elapsed);
+        std::cout << "OpenCL GPU: " << elapsed << ' ';
+        std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
+    }
+    std::cout << "------ Optimized (image) ------" << std::endl;
+    {
+        std::vector<float> c(m * k, 0);
+        float elapsed = 0;
+        ocl::multiplyImage(a.data(), b.data(), c.data(), m, n, k, cpuDeviceId, &elapsed);
+        std::cout << "OpenCL CPU: " << elapsed << ' ';
+        std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
+        for (int i = 0; i < 10; i++)
+            std::cout << c[i] << ' ';
+        std::cout << std::endl;
+    }
+    {
+        std::vector<float> c(m * k, 0);
+        float elapsed = 0;
+        ocl::multiplyImage(a.data(), b.data(), c.data(), m, n, k, gpuDeviceId, &elapsed);
+        std::cout << "OpenCL GPU: " << elapsed << ' ';
+        std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
+        for (int i = 0; i < 10; i++)
+            std::cout << c[i] << ' ';
+        std::cout << std::endl;
     }
 
     delete[] platform;
