@@ -1,29 +1,10 @@
 #define BLOCK_SIZE 16
 
-__kernel void multiplyImage(__read_only image2d_t a, __read_only image2d_t b, __write_only image2d_t c, int m, int n, int k) {
-    __local float A[BLOCK_SIZE][BLOCK_SIZE];
-    __local float B[BLOCK_SIZE][BLOCK_SIZE];
-    int local_row = get_local_id(1);
-    int local_col = get_local_id(0);
-    int row = get_global_id(0);
-    int col = get_global_id(1);
-    int blocks = m / BLOCK_SIZE;
-    float s = 0;
-    for (int i = 0; i < blocks; i++) {
-        int2 idxA = {BLOCK_SIZE * i + local_col, col};
-        int2 idxB = {row, BLOCK_SIZE * i + local_row};
-        A[local_row][local_col] = read_imagef(a, idxA).x;
-        B[local_row][local_col] = read_imagef(b, idxB).x;
-        barrier(CLK_LOCAL_MEM_FENCE);
-        for (int j = 0; j < BLOCK_SIZE; j++)
-            s += A[local_row][j] * B[j][local_col];
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-    int2 idxC = {row, col};
-    write_imagef(c, idxC, s);
-}
+/**
+ * Kernel multiplyImage works for square matrices only
+ */
 
-__kernel void multiplyImageNaive(__read_only image2d_t a, __read_only image2d_t b, __write_only image2d_t c, int m, int n, int k) {
+__kernel void multiplyImage(__read_only image2d_t a, __read_only image2d_t b, __write_only image2d_t c, int m, int n, int k) {
     __local float A[BLOCK_SIZE][BLOCK_SIZE];
     __local float B[BLOCK_SIZE][BLOCK_SIZE];
     int local_row = get_local_id(0);
@@ -33,15 +14,14 @@ __kernel void multiplyImageNaive(__read_only image2d_t a, __read_only image2d_t 
     int blocks = m / BLOCK_SIZE;
     float s = 0;
     for (int i = 0; i < blocks; i++) {
-        int2 idxA = {row, BLOCK_SIZE * i + local_col};
-        int2 idxB = {BLOCK_SIZE * i + local_row, col};
-        A[local_row][local_col] = read_imagef(a, idxA).x;
-        B[local_row][local_col] = read_imagef(b, idxB).x;
+        float x = read_imagef(a, (int2)(BLOCK_SIZE * i + local_row, col)).x;
+        float y = read_imagef(b, (int2)(row, BLOCK_SIZE * i + local_col)).x;
+        A[local_col][local_row] = x;
+        B[local_col][local_row] = y;
         barrier(CLK_LOCAL_MEM_FENCE);
         for (int j = 0; j < BLOCK_SIZE; j++)
-            s += A[local_row][j] * B[j][local_col];
+            s += A[local_col][j] * B[j][local_row];
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-    int2 idxC = {row, col};
-    write_imagef(c, idxC, (float4)(s, 0, 0, 0));
+    write_imagef(c, (int2)(row, col), s);
 }

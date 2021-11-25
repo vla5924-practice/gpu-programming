@@ -1,5 +1,11 @@
 #define BLOCK_SIZE 16
 
+/**
+ * Kernel multiplyBlockNaive works for any m, n, k and by-row matrices layout
+ * Kernel multiplyBlockTransposed works for any m, n, k and second matix transposed (by-column layout)
+ * Kernel multiplyBlockOptimal works for square matrices only (m = n = k)
+ */
+
 __kernel void multiplyBlockOptimal(__global float *a, __global float *b, __global float *c, int m, int n, int k) {
     __local float A[BLOCK_SIZE][BLOCK_SIZE];
     __local float B[BLOCK_SIZE][BLOCK_SIZE];
@@ -10,8 +16,6 @@ __kernel void multiplyBlockOptimal(__global float *a, __global float *b, __globa
     int blocks = m / BLOCK_SIZE;
     float s = 0;
     for (int i = 0; i < blocks; i++) {
-        // A[local_row][local_col] = a[col * m + BLOCK_SIZE * i + local_col];
-        // B[local_row][local_col] = b[(BLOCK_SIZE * i + local_row) * k + row];
         A[local_col][local_row] = a[col * m + BLOCK_SIZE * i + local_row];
         B[local_col][local_row] = b[(BLOCK_SIZE * i + local_col) * n + row];
         barrier(CLK_LOCAL_MEM_FENCE);

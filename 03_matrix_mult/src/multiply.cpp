@@ -155,38 +155,24 @@ void multiplyImage(float *a, float *b, float *c, int m, int n, int k, cl_device_
     const char *strings[] = {source.c_str()};
     cl_program program = clCreateProgramWithSource(context, 1, strings, nullptr, &ret);
     ret = clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
-    if (ret == CL_BUILD_PROGRAM_FAILURE) {
-        // Determine the size of the log
-        size_t log_size;
-        clGetProgramBuildInfo(program, deviceId, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
-
-        // Allocate memory for the log
-        char *log = (char *)malloc(log_size);
-
-        // Get the log
-        clGetProgramBuildInfo(program, deviceId, CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
-
-        // Print the log
-        printf("%s\n", log);
-    }
-    cl_kernel kernel = clCreateKernel(program, "multiplyImageNaive", &ret);
+    cl_kernel kernel = clCreateKernel(program, "multiplyImage", &ret);
 
     cl_image_format format;
     format.image_channel_order = CL_R;
     format.image_channel_data_type = CL_FLOAT;
     size_t origin[] = {0, 0, 0};
 
+    aMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, SAFE(m), SAFE(n), 0, nullptr, &ret);
+    bMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, SAFE(n), SAFE(k), 0, nullptr, &ret);
+    cMem = clCreateImage2D(context, CL_MEM_WRITE_ONLY, &format, SAFE(m), SAFE(k), 0, nullptr, &ret);
     {
-        aMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, SAFE(m), SAFE(n), 0, nullptr, &ret);
         size_t region[] = {SAFE(m), SAFE(n), 1};
         ret = clEnqueueWriteImage(queue, aMem, CL_TRUE, origin, region, 0, 0, a, 0, nullptr, nullptr);
     }
     {
-        bMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, SAFE(n), SAFE(k), 0, nullptr, &ret);
         size_t region[] = {SAFE(n), SAFE(k), 1};
         ret = clEnqueueWriteImage(queue, bMem, CL_TRUE, origin, region, 0, 0, b, 0, nullptr, nullptr);
     }
-    cMem = clCreateImage2D(context, CL_MEM_WRITE_ONLY, &format, SAFE(m), SAFE(k), 0, nullptr, &ret);
 
     ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), &aMem);
     ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), &bMem);
