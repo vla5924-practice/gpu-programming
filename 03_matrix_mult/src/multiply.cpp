@@ -1,10 +1,11 @@
 #include "multiply.hpp"
 
+#include <omp.h>
 #include <string>
 
-#include <omp.h>
-
 #include "utils.hpp"
+
+#define SAFE(X) (static_cast<size_t>(X))
 
 void multiply(float *a, float *b, float *c, int m, int n, int k) {
     for (int row = 0; row < m; row++) {
@@ -30,6 +31,12 @@ void multiply_omp(float *a, float *b, float *c, int m, int n, int k) {
 }
 
 namespace ocl {
+
+void transpose(float *c, int m, int k, float *cT) {
+    for (int i = 0; i < k; i++)
+        for (int j = 0; j < m; j++)
+            cT[i * m + j] = c[j * k + i];
+}
 
 void multiply(float *a, float *b, float *c, int m, int n, int k, cl_device_id deviceId, float *elapsed) {
     cl_context context = clCreateContext(nullptr, 1, &deviceId, nullptr, nullptr, nullptr);
@@ -63,7 +70,7 @@ void multiply(float *a, float *b, float *c, int m, int n, int k, cl_device_id de
     size_t group;
     clGetKernelWorkGroupInfo(kernel, deviceId, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &group, nullptr);
 
-    const size_t globalWorkSize[] = {static_cast<size_t>(m), static_cast<size_t>(k)};
+    const size_t globalWorkSize[] = {SAFE(m), SAFE(k)};
     const size_t localWorkSize[] = {4u, 4u};
     float begin = omp_get_wtime();
     ret = clEnqueueNDRangeKernel(queue, kernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
@@ -96,7 +103,7 @@ void multiplyBlock(float *a, float *b, float *c, int m, int n, int k, cl_device_
     const char *strings[] = {source.c_str()};
     cl_program program = clCreateProgramWithSource(context, 1, strings, nullptr, &ret);
     ret = clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
-    cl_kernel kernel = clCreateKernel(program, "multiplyBlock", &ret);
+    cl_kernel kernel = clCreateKernel(program, "multiplyBlockOptimal", &ret);
 
     aMem = clCreateBuffer(context, CL_MEM_READ_ONLY, m * n * sizeof(float), nullptr, &ret);
     ret = clEnqueueWriteBuffer(queue, aMem, CL_TRUE, 0, m * n * sizeof(float), a, 0, nullptr, nullptr);
@@ -115,7 +122,7 @@ void multiplyBlock(float *a, float *b, float *c, int m, int n, int k, cl_device_
     size_t group;
     clGetKernelWorkGroupInfo(kernel, deviceId, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &group, nullptr);
 
-    const size_t globalWorkSize[] = {static_cast<size_t>(m), static_cast<size_t>(k)};
+    const size_t globalWorkSize[] = {SAFE(m), SAFE(k)};
     const size_t localWorkSize[] = {16u, 16u};
     float begin = omp_get_wtime();
     ret = clEnqueueNDRangeKernel(queue, kernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
@@ -164,36 +171,22 @@ void multiplyImage(float *a, float *b, float *c, int m, int n, int k, cl_device_
     }
     cl_kernel kernel = clCreateKernel(program, "multiplyImageNaive", &ret);
 
+    cl_image_format format;
+    format.image_channel_order = CL_R;
+    format.image_channel_data_type = CL_FLOAT;
+    size_t origin[] = {0, 0, 0};
+
     {
-        cl_image_format format;
-        format.image_channel_order = CL_R;
-        format.image_channel_data_type = CL_FLOAT;
-        aMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, static_cast<size_t>(m), static_cast<size_t>(n), 0,
-                               nullptr, &ret);
-        const size_t origin[3]{0, 0, 0};
-        const size_t region[3]{static_cast<size_t>(m), static_cast<size_t>(n), 1};
+        aMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, SAFE(m), SAFE(n), 0, nullptr, &ret);
+        size_t region[] = {SAFE(m), SAFE(n), 1};
         ret = clEnqueueWriteImage(queue, aMem, CL_TRUE, origin, region, 0, 0, a, 0, nullptr, nullptr);
     }
     {
-        cl_image_format format;
-        format.image_channel_order = CL_R;
-        format.image_channel_data_type = CL_FLOAT;
-        bMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, static_cast<size_t>(n), static_cast<size_t>(k), 0,
-                               nullptr, &ret);
-        const size_t origin[3]{0, 0, 0};
-        const size_t region[3]{static_cast<size_t>(n), static_cast<size_t>(k), 1};
-        ret = clEnqueueWriteImage(queue, aMem, CL_TRUE, origin, region, 0, 0, b, 0, nullptr, nullptr);
+        bMem = clCreateImage2D(context, CL_MEM_READ_ONLY, &format, SAFE(n), SAFE(k), 0, nullptr, &ret);
+        size_t region[] = {SAFE(n), SAFE(k), 1};
+        ret = clEnqueueWriteImage(queue, bMem, CL_TRUE, origin, region, 0, 0, b, 0, nullptr, nullptr);
     }
-    {
-        cl_image_format format;
-        format.image_channel_order = CL_R;
-        format.image_channel_data_type = CL_FLOAT;
-        cMem = clCreateImage2D(context, CL_MEM_WRITE_ONLY, &format, static_cast<size_t>(m), static_cast<size_t>(k), 0,
-                               nullptr, &ret);
-        const size_t origin[3]{0, 0, 0};
-        const size_t region[3]{static_cast<size_t>(m), static_cast<size_t>(k), 1};
-        ret = clEnqueueWriteImage(queue, cMem, CL_TRUE, origin, region, 0, 0, c, 0, nullptr, nullptr);
-    }
+    cMem = clCreateImage2D(context, CL_MEM_WRITE_ONLY, &format, SAFE(m), SAFE(k), 0, nullptr, &ret);
 
     ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), &aMem);
     ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), &bMem);
@@ -202,7 +195,7 @@ void multiplyImage(float *a, float *b, float *c, int m, int n, int k, cl_device_
     ret = clSetKernelArg(kernel, 4, sizeof(int), &n);
     ret = clSetKernelArg(kernel, 5, sizeof(int), &k);
 
-    const size_t globalWorkSize[] = {static_cast<size_t>(m), static_cast<size_t>(k)};
+    const size_t globalWorkSize[] = {SAFE(m), SAFE(k)};
     const size_t localWorkSize[] = {16u, 16u};
     float begin = omp_get_wtime();
     ret = clEnqueueNDRangeKernel(queue, kernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
@@ -211,8 +204,7 @@ void multiplyImage(float *a, float *b, float *c, int m, int n, int k, cl_device_
     if (elapsed != nullptr)
         *elapsed = end - begin;
     {
-        const size_t origin[3]{0, 0, 0};
-        const size_t region[3]{static_cast<size_t>(m), static_cast<size_t>(k), 1};
+        size_t region[] = {SAFE(m), SAFE(k), 1};
         ret = clEnqueueReadImage(queue, cMem, CL_TRUE, origin, region, 0, 0, c, 0, nullptr, nullptr);
     }
 
