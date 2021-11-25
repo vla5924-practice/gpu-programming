@@ -50,15 +50,12 @@ int main() {
         multiply(a.data(), b.data(), cTarget.data(), m, n, k);
         float end = omp_get_wtime();
         std::cout << "Sequential: " << (end - begin) << std::endl;
-        for (int i = 0; i < 10; i++)
-            std::cout << cTarget[i] << ' ';
-        std::cout << std::endl;
     }
     std::cout << "------ Classic ------" << std::endl;
     {
         std::vector<float> c(m * k);
         float begin = omp_get_wtime();
-        multiply_omp(a.data(), b.data(), c.data(), m, n, k);
+        omp::multiply(a.data(), b.data(), c.data(), m, n, k);
         float end = omp_get_wtime();
         std::cout << "OpenMP: " << (end - begin) << ' ';
         std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
@@ -99,9 +96,6 @@ int main() {
         ocl::multiplyImage(a.data(), b.data(), c.data(), m, n, k, cpuDeviceId, &elapsed);
         std::cout << "OpenCL CPU: " << elapsed << ' ';
         std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
-        for (int i = 0; i < 10; i++)
-            std::cout << c[i] << ' ';
-        std::cout << std::endl;
     }
     {
         std::vector<float> c(m * k, 0);
@@ -109,9 +103,6 @@ int main() {
         ocl::multiplyImage(a.data(), b.data(), c.data(), m, n, k, gpuDeviceId, &elapsed);
         std::cout << "OpenCL GPU: " << elapsed << ' ';
         std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
-        for (int i = 0; i < 10; i++)
-            std::cout << c[i] << ' ';
-        std::cout << std::endl;
     }
 
     delete[] platform;
