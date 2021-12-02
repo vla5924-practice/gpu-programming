@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 
-project(03_matrix_mult LANGUAGES CXX)
+project(03_gemm LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(OpenMP REQUIRED)
 find_package(OpenCL 2.2 REQUIRED)
 
-set(TARGET_NAME matrix_mult)
+set(TARGET_NAME gemm)
 
 file(GLOB_RECURSE TARGET_HEADERS include/*.hpp)
 file(GLOB_RECURSE TARGET_SRC src/*.cpp)
