@@ -31,7 +31,7 @@ int main() {
 
     constexpr int n = 4500;
     constexpr int iter = 500;
-    constexpr float epsilon = 1e-6;
+    constexpr float convThreshold = 1e-6;
 
     std::vector<float> a(n * n);
     std::vector<float> b(n);
@@ -49,7 +49,7 @@ int main() {
 
     {
         std::vector<float> x(n, 0);
-        CompResults results = jacobi(a.data(), b.data(), x.data(), n, iter, epsilon, cpuDeviceId);
+        CompResults results = jacobi(a.data(), b.data(), x.data(), n, iter, convThreshold, cpuDeviceId);
         std::cout << "------" << std::endl;
         std::cout << "OpenCL CPU" << std::endl;
         std::cout << "Iterations: " << results.iter << std::endl;
@@ -60,7 +60,7 @@ int main() {
     }
     {
         std::vector<float> x(n, 0);
-        CompResults results = jacobi(a.data(), b.data(), x.data(), n, iter, epsilon, gpuDeviceId);
+        CompResults results = jacobi(a.data(), b.data(), x.data(), n, iter, convThreshold, gpuDeviceId);
         std::cout << "------" << std::endl;
         std::cout << "OpenCL GPU" << std::endl;
         std::cout << "Iterations: " << results.iter << std::endl;

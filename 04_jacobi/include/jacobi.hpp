@@ -9,5 +9,5 @@ struct CompResults {
     float convNorm = 0;
 };
 
-CompResults jacobi(float *a, float *b, float *x, int n, int iter, float epsilon, cl_device_id deviceId);
+CompResults jacobi(float *a, float *b, float *x, int n, int iter, float convThreshold, cl_device_id deviceId);
 float deviation(float *a, float *b, float *x, int n);
