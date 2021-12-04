@@ -7,12 +7,29 @@
 
 #include "utils.hpp"
 
-float norm(const std::vector<float> &x0, const std::vector<float> &x1) {
+static inline float vectorLength(const float *x, size_t n) {
+    float s = 0;
+    for (size_t i = 0; i < n; i++) {
+        s += x[i] * x[i];
+    }
+    return std::sqrt(s);
+}
+
+static inline float normAbs(const std::vector<float> &x0, const std::vector<float> &x1) {
     size_t n = x0.size();
     float s = 0;
-    for (size_t i = 0; i < n; i++)
+    for (size_t i = 0; i < n; i++) {
         s += (x0[i] - x1[i]) * (x0[i] - x1[i]);
+    }
     return std::sqrt(s);
+}
+
+static inline float normRel(const std::vector<float> &x0, const std::vector<float> &x1) {
+    return normAbs(x0, x1) / vectorLength(x0.data(), x0.size());
+}
+
+float norm(const std::vector<float> &x0, const std::vector<float> &x1) {
+    return normRel(x0, x1);
 }
 
 CompResults jacobi(float *a, float *b, float *x, int n, int iter, float convThreshold, cl_device_id deviceId) {
@@ -53,10 +70,10 @@ CompResults jacobi(float *a, float *b, float *x, int n, int iter, float convThre
         x0 = x1;
         clEnqueueWriteBuffer(queue, x0Mem, CL_TRUE, 0, vecSize, x0.data(), 0, nullptr, nullptr);
         size_t globalWorkSize = static_cast<size_t>(n);
-        float begin = omp_get_wtime();
+        double begin = omp_get_wtime();
         clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
         clFinish(queue);
-        float end = omp_get_wtime();
+        double end = omp_get_wtime();
         results.kernelTime += end - begin;
         clEnqueueReadBuffer(queue, x1Mem, CL_TRUE, 0, vecSize, x1.data(), 0, nullptr, nullptr);
         results.convNorm = norm(x0, x1);
@@ -78,7 +95,7 @@ CompResults jacobi(float *a, float *b, float *x, int n, int iter, float convThre
     return results;
 }
 
-float deviation(float *a, float *b, float *x, int n) {
+static inline float deviationAbs(float *a, float *b, float *x, int n) {
     float norm = 0;
     for (int i = 0; i < n; i++) {
         float s = 0;
@@ -89,4 +106,12 @@ float deviation(float *a, float *b, float *x, int n) {
         norm += s * s;
     }
     return sqrt(norm);
+}
+
+static inline float deviationRel(float *a, float *b, float *x, int n) {
+    return deviationAbs(a, b, x, n) / vectorLength(b, n);
+}
+
+float deviation(float *a, float *b, float *x, int n) {
+    return deviationRel(a, b, x, n);
 }
