@@ -38,14 +38,10 @@ void multiply(float *a, float *b, float *c, int n, cl_device_id deviceId, float 
     cl_mem cMem = clCreateBuffer(context, CL_MEM_READ_WRITE, byteSize, nullptr, nullptr);
     clEnqueueWriteBuffer(queue, cMem, CL_TRUE, 0, byteSize, c, 0, nullptr, nullptr);
 
-    int isUpper = 1;
-    int delim = n;
     clSetKernelArg(kernel, 0, sizeof(cl_mem), &aMem);
     clSetKernelArg(kernel, 1, sizeof(cl_mem), &bMem);
     clSetKernelArg(kernel, 2, sizeof(cl_mem), &cMem);
     clSetKernelArg(kernel, 3, sizeof(int), &n);
-    clSetKernelArg(kernel, 4, sizeof(int), &isUpper);
-    clSetKernelArg(kernel, 5, sizeof(int), &delim);
 
     size_t globalWorkSize[] = {SAFE(n), SAFE(n)};
     size_t localWorkSize[] = {16u, 16u};
@@ -97,28 +93,24 @@ void multiplyHetero(float *a, float *b, float *c, int n, int delim, cl_device_id
     ret = clFinish(cpuQueue);
     ret = clFinish(gpuQueue);
 
-    int cpuIsUpper = 1;
-    int gpuIsUpper = 0;
-
     ret = clSetKernelArg(cpuKernel, 0, sizeof(cl_mem), &aMemCpu);
     ret = clSetKernelArg(cpuKernel, 1, sizeof(cl_mem), &bMemCpu);
     ret = clSetKernelArg(cpuKernel, 2, sizeof(cl_mem), &cMemCpu);
     ret = clSetKernelArg(cpuKernel, 3, sizeof(int), &n);
-    ret = clSetKernelArg(cpuKernel, 4, sizeof(int), &cpuIsUpper);
-    ret = clSetKernelArg(cpuKernel, 5, sizeof(int), &delim);
 
     ret = clSetKernelArg(gpuKernel, 0, sizeof(cl_mem), &aMemGpu);
     ret = clSetKernelArg(gpuKernel, 1, sizeof(cl_mem), &bMemGpu);
     ret = clSetKernelArg(gpuKernel, 2, sizeof(cl_mem), &cMemGpu);
     ret = clSetKernelArg(gpuKernel, 3, sizeof(int), &n);
-    ret = clSetKernelArg(gpuKernel, 4, sizeof(int), &gpuIsUpper);
-    ret = clSetKernelArg(gpuKernel, 5, sizeof(int), &delim);
 
-    size_t globalWorkSize[] = {SAFE(n), SAFE(n)};
+    size_t cpuWorkSize[] = {SAFE(n), SAFE(delim)};
+    size_t gpuWorkSize[] = {SAFE(n), SAFE(n - delim)};
+    size_t cpuOffset[] = {SAFE(0), SAFE(0)};
+    size_t gpuOffset[] = {SAFE(0), SAFE(delim)};
     size_t localWorkSize[] = {16u, 16u};
     float begin = omp_get_wtime();
-    ret = clEnqueueNDRangeKernel(cpuQueue, cpuKernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
-    ret = clEnqueueNDRangeKernel(gpuQueue, gpuKernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
+    ret = clEnqueueNDRangeKernel(cpuQueue, cpuKernel, 2, cpuOffset, cpuWorkSize, localWorkSize, 0, nullptr, nullptr);
+    ret = clEnqueueNDRangeKernel(gpuQueue, gpuKernel, 2, gpuOffset, gpuWorkSize, localWorkSize, 0, nullptr, nullptr);
     ret = clFinish(cpuQueue);
     ret = clFinish(gpuQueue);
     float end = omp_get_wtime();
