@@ -2,13 +2,13 @@
 
 __kernel void multiply(__global float *a, __global float *b, __global float *c, int n, int isUpper, int delim) {
     int row = get_global_id(0);
-    if ((isUpper && row >= delim) || (!isUpper && row < delim))
+    int col = get_global_id(1);
+    if ((isUpper && (col >= delim)) || (!isUpper && (col < delim)))
         return;
     __local float A[BLOCK_SIZE][BLOCK_SIZE];
     __local float B[BLOCK_SIZE][BLOCK_SIZE];
     int local_row = get_local_id(0);
     int local_col = get_local_id(1);
-    int col = get_global_id(1);
     int blocks = n / BLOCK_SIZE;
     float s = 0;
     for (int i = 0; i < blocks; i++) {

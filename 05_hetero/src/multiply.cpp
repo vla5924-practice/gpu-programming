@@ -30,12 +30,13 @@ void multiply(float *a, float *b, float *c, int n, cl_device_id deviceId, float 
     clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
     cl_kernel kernel = clCreateKernel(program, "multiply", nullptr);
 
-    cl_mem aMem = clCreateBuffer(context, CL_MEM_READ_ONLY, n * n * sizeof(float), nullptr, nullptr);
-    clEnqueueWriteBuffer(queue, aMem, CL_TRUE, 0, n * n * sizeof(float), a, 0, nullptr, nullptr);
-    cl_mem bMem = clCreateBuffer(context, CL_MEM_READ_ONLY, n * n * sizeof(float), nullptr, nullptr);
-    clEnqueueWriteBuffer(queue, bMem, CL_TRUE, 0, n * n * sizeof(float), b, 0, nullptr, nullptr);
-    cl_mem cMem = clCreateBuffer(context, CL_MEM_READ_WRITE, n * n * sizeof(float), nullptr, nullptr);
-    clEnqueueWriteBuffer(queue, cMem, CL_TRUE, 0, n * n * sizeof(float), c, 0, nullptr, nullptr);
+    size_t byteSize = n * n * sizeof(float);
+    cl_mem aMem = clCreateBuffer(context, CL_MEM_READ_ONLY, byteSize, nullptr, nullptr);
+    clEnqueueWriteBuffer(queue, aMem, CL_TRUE, 0, byteSize, a, 0, nullptr, nullptr);
+    cl_mem bMem = clCreateBuffer(context, CL_MEM_READ_ONLY, byteSize, nullptr, nullptr);
+    clEnqueueWriteBuffer(queue, bMem, CL_TRUE, 0, byteSize, b, 0, nullptr, nullptr);
+    cl_mem cMem = clCreateBuffer(context, CL_MEM_READ_WRITE, byteSize, nullptr, nullptr);
+    clEnqueueWriteBuffer(queue, cMem, CL_TRUE, 0, byteSize, c, 0, nullptr, nullptr);
 
     int isUpper = 1;
     int delim = n;
@@ -54,7 +55,7 @@ void multiply(float *a, float *b, float *c, int n, cl_device_id deviceId, float 
     float end = omp_get_wtime();
     if (elapsed != nullptr)
         *elapsed = end - begin;
-    clEnqueueReadBuffer(queue, cMem, CL_TRUE, 0, n * n * sizeof(float), c, 0, nullptr, nullptr);
+    clEnqueueReadBuffer(queue, cMem, CL_TRUE, 0, byteSize, c, 0, nullptr, nullptr);
 
     clReleaseMemObject(aMem);
     clReleaseMemObject(bMem);
@@ -82,18 +83,17 @@ void multiplyHetero(float *a, float *b, float *c, int n, int delim, cl_device_id
     cl_kernel cpuKernel = clCreateKernel(cpuProgram, "multiply", &ret);
     cl_kernel gpuKernel = clCreateKernel(gpuProgram, "multiply", &ret);
 
-    cl_mem aMemCpu = clCreateBuffer(cpuContext, CL_MEM_READ_ONLY, n * n * sizeof(float), nullptr, &ret);
-    cl_mem aMemGpu = clCreateBuffer(gpuContext, CL_MEM_READ_ONLY, n * n * sizeof(float), nullptr, &ret);
-    ret = clEnqueueWriteBuffer(cpuQueue, aMemCpu, CL_FALSE, 0, n * n * sizeof(float), a, 0, nullptr, nullptr);
-    ret = clEnqueueWriteBuffer(gpuQueue, aMemGpu, CL_FALSE, 0, n * n * sizeof(float), a, 0, nullptr, nullptr);
-    cl_mem bMemCpu = clCreateBuffer(cpuContext, CL_MEM_READ_ONLY, n * n * sizeof(float), nullptr, &ret);
-    cl_mem bMemGpu = clCreateBuffer(gpuContext, CL_MEM_READ_ONLY, n * n * sizeof(float), nullptr, &ret);
-    ret = clEnqueueWriteBuffer(cpuQueue, bMemCpu, CL_FALSE, 0, n * n * sizeof(float), b, 0, nullptr, nullptr);
-    ret = clEnqueueWriteBuffer(gpuQueue, bMemGpu, CL_FALSE, 0, n * n * sizeof(float), b, 0, nullptr, nullptr);
-    cl_mem cMemCpu = clCreateBuffer(cpuContext, CL_MEM_READ_WRITE, n * n * sizeof(float), nullptr, &ret);
-    cl_mem cMemGpu = clCreateBuffer(gpuContext, CL_MEM_READ_WRITE, n * n * sizeof(float), nullptr, &ret);
-    ret = clEnqueueWriteBuffer(cpuQueue, cMemCpu, CL_FALSE, 0, n * n * sizeof(float), c, 0, nullptr, nullptr);
-    ret = clEnqueueWriteBuffer(gpuQueue, cMemGpu, CL_FALSE, 0, n * n * sizeof(float), c, 0, nullptr, nullptr);
+    size_t byteSize = n * n * sizeof(float);
+    cl_mem aMemCpu = clCreateBuffer(cpuContext, CL_MEM_READ_ONLY, byteSize, nullptr, &ret);
+    cl_mem aMemGpu = clCreateBuffer(gpuContext, CL_MEM_READ_ONLY, byteSize, nullptr, &ret);
+    ret = clEnqueueWriteBuffer(cpuQueue, aMemCpu, CL_FALSE, 0, byteSize, a, 0, nullptr, nullptr);
+    ret = clEnqueueWriteBuffer(gpuQueue, aMemGpu, CL_FALSE, 0, byteSize, a, 0, nullptr, nullptr);
+    cl_mem bMemCpu = clCreateBuffer(cpuContext, CL_MEM_READ_ONLY, byteSize, nullptr, &ret);
+    cl_mem bMemGpu = clCreateBuffer(gpuContext, CL_MEM_READ_ONLY, byteSize, nullptr, &ret);
+    ret = clEnqueueWriteBuffer(cpuQueue, bMemCpu, CL_FALSE, 0, byteSize, b, 0, nullptr, nullptr);
+    ret = clEnqueueWriteBuffer(gpuQueue, bMemGpu, CL_FALSE, 0, byteSize, b, 0, nullptr, nullptr);
+    cl_mem cMemCpu = clCreateBuffer(cpuContext, CL_MEM_WRITE_ONLY, byteSize, nullptr, &ret);
+    cl_mem cMemGpu = clCreateBuffer(gpuContext, CL_MEM_WRITE_ONLY, byteSize, nullptr, &ret);
     ret = clFinish(cpuQueue);
     ret = clFinish(gpuQueue);
 
@@ -124,8 +124,9 @@ void multiplyHetero(float *a, float *b, float *c, int n, int delim, cl_device_id
     float end = omp_get_wtime();
     if (elapsed != nullptr)
         *elapsed = end - begin;
-    ret = clEnqueueReadBuffer(cpuQueue, cMemCpu, CL_FALSE, 0, n * n * sizeof(float), c, 0, nullptr, nullptr);
-    ret = clEnqueueReadBuffer(gpuQueue, cMemGpu, CL_FALSE, delim, n * n * sizeof(float), c, 0, nullptr, nullptr);
+    ret = clEnqueueReadBuffer(cpuQueue, cMemCpu, CL_FALSE, 0, delim * n * sizeof(float), c, 0, nullptr, nullptr);
+    ret = clEnqueueReadBuffer(gpuQueue, cMemGpu, CL_FALSE, delim * n * sizeof(float),
+                              byteSize - delim * n * sizeof(float), c + delim * n, 0, nullptr, nullptr);
     ret = clFinish(cpuQueue);
     ret = clFinish(gpuQueue);
 

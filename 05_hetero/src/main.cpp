@@ -68,7 +68,7 @@ int main() {
     {
         std::vector<float> c(m * k, 0);
         float elapsed = 0;
-        ocl::multiplyHetero(a.data(), b.data(), c.data(), n, 50 * 16, cpuDeviceId, gpuDeviceId, &elapsed);
+        ocl::multiplyHetero(a.data(), b.data(), c.data(), n, 16 * 50, cpuDeviceId, gpuDeviceId, &elapsed);
         std::cout << "OpenCL CPU+GPU: " << elapsed << ' ';
         std::cout << Utils::status(Utils::equals(c, cTarget)) << std::endl;
     }
