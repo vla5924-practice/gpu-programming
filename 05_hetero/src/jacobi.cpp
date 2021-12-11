@@ -102,8 +102,8 @@ CompResults jacobiHetero(float *a, float *b, float *x, int n, int iter, float co
 
     cl_context cpuContext = clCreateContext(nullptr, 1, &cpuDeviceId, nullptr, nullptr, nullptr);
     cl_context gpuContext = clCreateContext(nullptr, 1, &gpuDeviceId, nullptr, nullptr, nullptr);
-    cl_command_queue cpuQueue = clCreateCommandQueue(cpuContext, cpuDeviceId, 0, nullptr);
-    cl_command_queue gpuQueue = clCreateCommandQueue(gpuContext, gpuDeviceId, 0, nullptr);
+    cl_command_queue cpuQueue = clCreateCommandQueue(cpuContext, cpuDeviceId, CL_QUEUE_PROFILING_ENABLE, nullptr);
+    cl_command_queue gpuQueue = clCreateCommandQueue(gpuContext, gpuDeviceId, CL_QUEUE_PROFILING_ENABLE, nullptr);
 
     std::string source = Utils::readFile(KERNELS_DIR "jacobi.cl");
     const char *strings[] = {source.c_str()};
@@ -150,6 +150,14 @@ CompResults jacobiHetero(float *a, float *b, float *x, int n, int iter, float co
 
     std::vector<float> x0(0, n);
     std::vector<float> x1(b, b + n);
+    size_t cpuWorkSize = static_cast<size_t>(delim);
+    size_t gpuWorkSize = static_cast<size_t>(n - delim);
+    size_t cpuOffset = 0;
+    size_t gpuOffset = static_cast<size_t>(delim);
+
+    cl_event events[2];
+    cl_ulong cpuTime[2], gpuTime[2];
+    double times[2] = {0};
 
     do {
         x0 = x1;
@@ -158,17 +166,20 @@ CompResults jacobiHetero(float *a, float *b, float *x, int n, int iter, float co
         clFinish(cpuQueue);
         clFinish(gpuQueue);
 
-        size_t cpuWorkSize = static_cast<size_t>(delim);
-        size_t gpuWorkSize = static_cast<size_t>(n - delim);
-        size_t cpuOffset = 0;
-        size_t gpuOffset = static_cast<size_t>(delim);
-        double begin = omp_get_wtime();
-        clEnqueueNDRangeKernel(cpuQueue, cpuKernel, 1, &cpuOffset, &cpuWorkSize, nullptr, 0, nullptr, nullptr);
-        clEnqueueNDRangeKernel(gpuQueue, gpuKernel, 1, &gpuOffset, &gpuWorkSize, nullptr, 0, nullptr, nullptr);
+        clEnqueueNDRangeKernel(cpuQueue, cpuKernel, 1, &cpuOffset, &cpuWorkSize, nullptr, 0, nullptr, events + 0);
+        clEnqueueNDRangeKernel(gpuQueue, gpuKernel, 1, &gpuOffset, &gpuWorkSize, nullptr, 0, nullptr, events + 1);
+        clWaitForEvents(2, events);
         clFinish(cpuQueue);
         clFinish(gpuQueue);
-        double end = omp_get_wtime();
-        results.kernelTime += end - begin;
+
+        clGetEventProfilingInfo(events[0], CL_PROFILING_COMMAND_START, sizeof(cl_ulong), cpuTime, nullptr);
+        clGetEventProfilingInfo(events[0], CL_PROFILING_COMMAND_END, sizeof(cl_ulong), cpuTime + 1, nullptr);
+        clGetEventProfilingInfo(events[1], CL_PROFILING_COMMAND_START, sizeof(cl_ulong), gpuTime, nullptr);
+        clGetEventProfilingInfo(events[1], CL_PROFILING_COMMAND_END, sizeof(cl_ulong), gpuTime + 1, nullptr);
+        times[0] = (cpuTime[1] - cpuTime[0]) / 1e9;
+        times[1] = (gpuTime[1] - gpuTime[0]) / 1e9;
+        results.kernelTime += times[0] > times[1] ? times[0] : times[1];
+
         clEnqueueReadBuffer(cpuQueue, x1MemCpu, CL_FALSE, 0, delim * sizeof(float), x1.data(), 0, nullptr, nullptr);
         clEnqueueReadBuffer(gpuQueue, x1MemGpu, CL_FALSE, delim * sizeof(float), vecSize - delim * sizeof(float),
                             x1.data() + delim, 0, nullptr, nullptr);

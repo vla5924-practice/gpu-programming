@@ -67,8 +67,8 @@ void multiplyHetero(float *a, float *b, float *c, int n, int delim, cl_device_id
     cl_int ret = 0;
     cl_context cpuContext = clCreateContext(nullptr, 1, &cpuDeviceId, nullptr, nullptr, &ret);
     cl_context gpuContext = clCreateContext(nullptr, 1, &gpuDeviceId, nullptr, nullptr, &ret);
-    cl_command_queue cpuQueue = clCreateCommandQueue(cpuContext, cpuDeviceId, 0, &ret);
-    cl_command_queue gpuQueue = clCreateCommandQueue(gpuContext, gpuDeviceId, 0, &ret);
+    cl_command_queue cpuQueue = clCreateCommandQueue(cpuContext, cpuDeviceId, CL_QUEUE_PROFILING_ENABLE, &ret);
+    cl_command_queue gpuQueue = clCreateCommandQueue(gpuContext, gpuDeviceId, CL_QUEUE_PROFILING_ENABLE, &ret);
 
     std::string source = Utils::readFile(KERNELS_DIR "multiply.cl");
     const char *strings[] = {source.c_str()};
@@ -108,14 +108,26 @@ void multiplyHetero(float *a, float *b, float *c, int n, int delim, cl_device_id
     size_t cpuOffset[] = {SAFE(0), SAFE(0)};
     size_t gpuOffset[] = {SAFE(0), SAFE(delim)};
     size_t localWorkSize[] = {16u, 16u};
-    float begin = omp_get_wtime();
-    ret = clEnqueueNDRangeKernel(cpuQueue, cpuKernel, 2, cpuOffset, cpuWorkSize, localWorkSize, 0, nullptr, nullptr);
-    ret = clEnqueueNDRangeKernel(gpuQueue, gpuKernel, 2, gpuOffset, gpuWorkSize, localWorkSize, 0, nullptr, nullptr);
+
+    cl_event events[2];
+
+    ret = clEnqueueNDRangeKernel(cpuQueue, cpuKernel, 2, cpuOffset, cpuWorkSize, localWorkSize, 0, nullptr, events + 0);
+    ret = clEnqueueNDRangeKernel(gpuQueue, gpuKernel, 2, gpuOffset, gpuWorkSize, localWorkSize, 0, nullptr, events + 1);
+    clWaitForEvents(2, events);
     ret = clFinish(cpuQueue);
     ret = clFinish(gpuQueue);
-    float end = omp_get_wtime();
+
+    cl_ulong cpuTime[2], gpuTime[2];
+    clGetEventProfilingInfo(events[0], CL_PROFILING_COMMAND_START, sizeof(cl_ulong), cpuTime, nullptr);
+    clGetEventProfilingInfo(events[0], CL_PROFILING_COMMAND_END, sizeof(cl_ulong), cpuTime + 1, nullptr);
+    clGetEventProfilingInfo(events[1], CL_PROFILING_COMMAND_START, sizeof(cl_ulong), gpuTime, nullptr);
+    clGetEventProfilingInfo(events[1], CL_PROFILING_COMMAND_END, sizeof(cl_ulong), gpuTime + 1, nullptr);
+    double times[2] = {0};
+    times[0] = (cpuTime[1] - cpuTime[0]) / 1e9;
+    times[1] = (gpuTime[1] - gpuTime[0]) / 1e9;
     if (elapsed != nullptr)
-        *elapsed = end - begin;
+        *elapsed = times[0] > times[1] ? times[0] : times[1];
+
     ret = clEnqueueReadBuffer(cpuQueue, cMemCpu, CL_FALSE, 0, delim * n * sizeof(float), c, 0, nullptr, nullptr);
     ret = clEnqueueReadBuffer(gpuQueue, cMemGpu, CL_FALSE, delim * n * sizeof(float),
                               byteSize - delim * n * sizeof(float), c + delim * n, 0, nullptr, nullptr);

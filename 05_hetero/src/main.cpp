@@ -25,7 +25,7 @@ int main() {
     clGetDeviceInfo(cpuDeviceId, CL_DEVICE_NAME, 128, deviceName, nullptr);
     std::cout << "CPU: " << deviceName << std::endl;
     cl_device_id gpuDeviceId = 0;
-    clGetDeviceIDs(platform[1], CL_DEVICE_TYPE_GPU, 1, &gpuDeviceId, &deviceCount);
+    clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 1, &gpuDeviceId, &deviceCount);
     clGetDeviceInfo(gpuDeviceId, CL_DEVICE_NAME, 128, deviceName, nullptr);
     std::cout << "GPU: " << deviceName << std::endl;
     std::cout << "------" << std::endl;
@@ -37,15 +37,6 @@ int main() {
         Utils::fillRandomly(a);
         Utils::fillRandomly(b);
         std::cout << std::defaultfloat << std::setprecision(6);
-        /*
-        {
-            std::vector<float> c(m * k, 0);
-            float begin = omp_get_wtime();
-            multiply(a.data(), b.data(), c.data(), n);
-            float end = omp_get_wtime();
-            std::cout << "Sequential: " << (end - begin) << std::endl;
-        }
-        */
         {
             std::vector<float> c(n * n, 0);
             float elapsed = 0;
@@ -61,7 +52,7 @@ int main() {
         {
             std::vector<float> c(n * n, 0);
             float elapsed = 0;
-            ocl::multiplyHetero(a.data(), b.data(), c.data(), n, 16 * 199, cpuDeviceId, gpuDeviceId, &elapsed);
+            ocl::multiplyHetero(a.data(), b.data(), c.data(), n, 16 * 16, cpuDeviceId, gpuDeviceId, &elapsed);
             std::cout << "OpenCL CPU+GPU: " << elapsed << std::endl;
         }
     }
@@ -102,7 +93,7 @@ int main() {
         {
             std::vector<float> x(n, 0);
             CompResults results =
-                jacobiHetero(a.data(), b.data(), x.data(), n, iter, convThreshold, 200, cpuDeviceId, gpuDeviceId);
+                jacobiHetero(a.data(), b.data(), x.data(), n, iter, convThreshold, 400, cpuDeviceId, gpuDeviceId);
             std::cout << "OpenCL CPU+GPU: " << results.kernelTime << ", iters: " << results.iter
                       << ", full time: " << results.fullTime << ", conv norm: " << results.convNorm
                       << ", deviation: " << deviation(a.data(), b.data(), x.data(), n) << std::endl;
